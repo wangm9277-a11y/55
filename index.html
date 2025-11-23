@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>大便神鹰 (Eagle vs Cavemen)</title>
+    <style>
+        /* --- CSS STYLES --- */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Courier New', Courier, monospace;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            color: white;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #222;
+        }
+
+        /* Canvas Wrapper to maintain aspect ratio logic if needed, 
+           but here we fill available space above controls */
+        #canvas-wrapper {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            background: #333;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            text-align: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 3rem;
+            color: #FACC15;
+            margin: 0 0 1rem 0;
+            text-shadow: 4px 4px 0 #000;
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        p {
+            color: #D1D5DB;
+            margin: 0.5rem 0;
+            font-size: 1.1rem;
+            max-width: 90%;
+            line-height: 1.4;
+        }
+
+        .highlight-red { color: #EF4444; font-weight: bold; }
+        .highlight-orange { color: #F97316; font-weight: bold; }
+        .highlight-yellow { color: #EAB308; font-weight: bold; }
+        .text-green { color: #4ADE80; }
+        .text-red { color: #F87171; }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+            width: 200px;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            border-bottom: 4px solid rgba(0,0,0,0.3);
+            transition: transform 0.1s, filter 0.1s;
+            color: white;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            border-bottom-width: 0;
+            margin-bottom: 4px;
+        }
+
+        .btn-green { background-color: #16A34A; border-color: #14532D; }
+        .btn-green:hover { background-color: #22C55E; }
+
+        .btn-blue { background-color: #2563EB; border-color: #1E3A8A; }
+        .btn-blue:hover { background-color: #3B82F6; }
+
+        .btn-red { background-color: #DC2626; border-color: #7F1D1D; }
+        .btn-red:hover { background-color: #EF4444; }
+
+        .btn-white { background-color: #F3F4F6; color: #111; border-color: #9CA3AF; }
+        .btn-white:hover { background-color: #FFFFFF; }
+
+        /* HUD */
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 15px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #hearts {
+            font-size: 1.8rem;
+            display: flex;
+            gap: 2px;
+            filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));
+        }
+
+        .rage-mode {
+            animation: pulse 1s infinite;
+            color: #EF4444;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #poop-hud {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .poop-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .poop-bar-frame {
+            width: 120px;
+            height: 12px;
+            background: #1F2937;
+            border: 2px solid #9CA3AF;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #poop-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #B45309, #F59E0B);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .poop-ready {
+            color: #FCD34D;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-top: 2px;
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-2px); }
+        }
+
+        /* Controls Area */
+        #controls-area {
+            width: 100%;
+            height: 200px;
+            background: #111827;
+            border-top: 4px solid #374151;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            position: relative;
+        }
+
+        #controls-label {
+            position: absolute;
+            top: -20px;
+            background: #374151;
+            padding: 2px 10px;
+            border-radius: 10px 10px 0 0;
+            font-size: 0.8rem;
+            color: #9CA3AF;
+        }
+
+        #joystick-base {
+            width: 140px;
+            height: 140px;
+            background: #1F2937;
+            border-radius: 50%;
+            border: 2px solid #4B5563;
+            position: relative;
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.5);
+            touch-action: none;
+        }
+
+        #joystick-stick {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #E5E7EB, #9CA3AF);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -25px;
+            margin-left: -25px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            pointer-events: none;
+            transform: translate(0px, 0px);
+        }
+
+        #joystick-stick.active {
+            background: linear-gradient(135deg, #FACC15, #CA8A04);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Canvas Wrapper -->
+        <div id="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="ui-layer">
+                <!-- HUD -->
+                <div id="hud" class="hidden">
+                    <div>
+                        <div id="hearts">❤️❤️❤️</div>
+                        <div id="rage-text" class="rage-mode hidden">暴怒模式!</div>
+                    </div>
+                    <div id="poop-hud">
+                        <div class="poop-row">
+                            <span>💩</span>
+                            <div class="poop-bar-frame">
+                                <div id="poop-bar-fill"></div>
+                            </div>
+                        </div>
+                        <div id="poop-ready-text" class="poop-ready hidden">READY!</div>
+                    </div>
+                </div>
+
+                <!-- Main Menu -->
+                <div id="menu-screen" class="screen">
+                    <h1>大便神鹰</h1>
+                    <div style="margin-bottom: 20px;">
+                        <p>操作下方摇杆飞行</p>
+                        <p>俯冲接触进行<span class="highlight-red">抓取</span></p>
+                        <p>虚线<span class="highlight-orange">上方</span>松开：摔死敌人</p>
+                        <p>虚线<span class="highlight-yellow">下方</span>松开：眩晕敌人</p>
+                        <p>大便自动积攒并投掷</p>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-green" onclick="startGame('EASY')">简单 (3个敌人)</button>
+                        <button class="btn-blue" onclick="startGame('NORMAL')">正常 (4个敌人)</button>
+                        <button class="btn-red" onclick="startGame('HARD')">困难 (5个敌人)</button>
+                    </div>
+                </div>
+
+                <!-- Game Over -->
+                <div id="gameover-screen" class="screen hidden">
+                    <h2 id="go-title">游戏结束</h2>
+                    <p id="go-msg">你被击落了...</p>
+                    <div class="btn-group">
+                        <button class="btn-white" onclick="showMenu()">返回菜单</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls-area">
+            <div id="controls-label">CONTROL PAD</div>
+            <div id="joystick-base">
+                <div id="joystick-stick"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ------------------------------------------------------------------
+         * CONSTANTS & CONFIG
+         * ------------------------------------------------------------------
+         */
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 800; 
+        const KILL_LINE_Y = GAME_HEIGHT / 2;
+
+        const EAGLE_SIZE = 60;
+        const EAGLE_MAX_HP = 3;
+        const EAGLE_BASE_SPEED = 0.5;
+        const EAGLE_BOOST_SPEED = 0.8;
+        const FRICTION = 0.92;
+
+        const CAVEMAN_SIZE = 40;
+        const CAVEMAN_Y_POS = GAME_HEIGHT - 60;
+
+        const ARROW_SPEED = 5.0;
+        const STUN_DURATION = 5000;
+        const FALL_STUN_DURATION = 2000;
+
+        const POOP_CHARGE_TIME = 2000; // 2 seconds as requested
+        const POOP_GRAVITY = 0.4;
+
+        const DIFFICULTY_SETTINGS = {
+            'EASY': { enemyCount: 3, moveSpeed: 1, fireInterval: 2000 },
+            'NORMAL': { enemyCount: 4, moveSpeed: 2, fireInterval: 1200 },
+            'HARD': { enemyCount: 5, moveSpeed: 3.5, fireInterval: 600 }
+        };
+
+        const COLORS = {
+            sky: '#87CEEB',
+            ground: '#8B4513',
+            grass: '#228B22',
+            eagleBody: '#8B4513',
+            eagleHead: '#F5F5F5',
+            eagleBeak: '#FFD700',
+            sunglasses: '#000000',
+            cavemanSkin: '#FFC0CB',
+            cavemanSkirt: '#006400',
+            poop: '#5D4037',
+            killLine: 'rgba(255, 255, 255, 0.3)'
+        };
+
+        /**
+         * ------------------------------------------------------------------
+         * GAME STATE
+         * ------------------------------------------------------------------
+         */
+        let canvas, ctx;
+        let animationFrameId;
+        let lastTime = 0;
+        let currentDifficulty = 'NORMAL';
+        let isPlaying = false;
+
+        // Input State
+        const input = {
+            dx: 0,
+            dy: 0,
+            active: false,
+            justReleased: false
+        };
+
+        // Entities
+        let eagle = {};
+        let cavemen = [];
+        let projectiles = [];
+        let poops = [];
+        let particles = [];
+
+        /**
+         * ------------------------------------------------------------------
+         * INITIALIZATION
+         * ------------------------------------------------------------------
+         */
+        window.onload = () => {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Set internal resolution
+            canvas.width = GAME_WIDTH;
+            canvas.height = GAME_HEIGHT;
+
+            setupJoystick();
+            // Initial render background
+            drawBackground(GAME_WIDTH, GAME_HEIGHT);
+        };
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty;
+            isPlaying = true;
+
+            // Hide Screens
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            initEntities();
+            
+            lastTime = performance.now();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function showMenu() {
+            isPlaying = false;
+            document.getElementById('menu-screen').classList.remove('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        }
+
+        function gameOver(won) {
+            isPlaying = false;
+            const screen = document.getElementById('gameover-screen');
+            const title = document.getElementById('go-title');
+            const msg = document.getElementById('go-msg');
+
+            screen.classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+
+            if (won) {
+                title.innerText = "胜利!";
+                title.className = "text-green";
+                msg.innerText = "原始人已被清除，天空属于你！";
+            } else {
+                title.innerText = "游戏结束";
+                title.className = "text-red";
+                msg.innerText = "你被击落了...";
+            }
+        }
+
+        function initEntities() {
+            const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+
+            // Eagle
+            eagle = {
+                x: GAME_WIDTH / 2,
+                y: 100,
+                vx: 0, vy: 0,
+                hp: EAGLE_MAX_HP,
+                holdingId: null,
+                poopCharge: 0,
+                isSpeedBoosted: false
+            };
+
+            // Cavemen
+            cavemen = [];
+            for (let i = 0; i < settings.enemyCount; i++) {
+                cavemen.push({
+                    id: i,
+                    x: (GAME_WIDTH / (settings.enemyCount + 1)) * (i + 1),
+                    y: CAVEMAN_Y_POS,
+                    state: 'IDLE', // IDLE, WALKING, GRABBED, FALLING, STUNNED, DEAD
+                    hp: 3,
+                    lastShotTime: Date.now() + Math.random() * 2000,
+                    vx: Math.random() > 0.5 ? settings.moveSpeed : -settings.moveSpeed,
+                    stunTimer: 0,
+                    direction: 1
+                });
+            }
+
+            projectiles = [];
+            poops = [];
+            particles = [];
+            input.justReleased = false;
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * GAME LOOP
+         * ------------------------------------------------------------------
+         */
+        function gameLoop(time) {
+            if (!isPlaying) return;
+
+            const dt = time - lastTime;
+            lastTime = time;
+
+            updatePhysics(dt);
+            render();
+            updateHUD();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function updatePhysics(dt) {
+            const now = Date.now();
+            const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+
+            // --- EAGLE MOVEMENT ---
+            if (eagle.hp <= 1) eagle.isSpeedBoosted = true;
+            else eagle.isSpeedBoosted = false;
+
+            // Handle Grab Release
+            if (input.justReleased) {
+                if (eagle.holdingId !== null) {
+                    const held = cavemen.find(c => c.id === eagle.holdingId);
+                    if (held) {
+                        held.state = 'FALLING';
+                        held.fallStartY = held.y;
+                        held.vx = eagle.vx;
+                        eagle.holdingId = null;
+                    }
+                }
+                input.justReleased = false;
+            }
+
+            // Move
+            let accel = eagle.isSpeedBoosted ? EAGLE_BOOST_SPEED : EAGLE_BASE_SPEED;
+            if (eagle.holdingId !== null) accel *= 0.8;
+
+            if (input.active) {
+                eagle.vx += input.dx * accel;
+                eagle.vy += input.dy * accel;
+            }
+
+            eagle.vx *= FRICTION;
+            eagle.vy *= FRICTION;
+            eagle.x += eagle.vx;
+            eagle.y += eagle.vy;
+
+            // Bounds
+            const halfSize = EAGLE_SIZE / 2;
+            if (eagle.x < halfSize) { eagle.x = halfSize; eagle.vx *= -0.5; }
+            if (eagle.x > GAME_WIDTH - halfSize) { eagle.x = GAME_WIDTH - halfSize; eagle.vx *= -0.5; }
+            if (eagle.y < halfSize) { eagle.y = halfSize; eagle.vy *= -0.5; }
+            if (eagle.y > GAME_HEIGHT - 60) { eagle.y = GAME_HEIGHT - 60; eagle.vy *= -0.5; }
+
+            // --- POOP GENERATION ---
+            if (eagle.poopCharge < 100) {
+                eagle.poopCharge += (dt / POOP_CHARGE_TIME) * 100;
+            } else {
+                poops.push({
+                    x: eagle.x,
+                    y: eagle.y + halfSize,
+                    vx: eagle.vx * 0.5,
+                    vy: 2
+                });
+                eagle.poopCharge = 0;
+            }
+
+            // --- CAVEMEN LOGIC ---
+            let livingCount = 0;
+            cavemen.forEach(cm => {
+                if (cm.state === 'DEAD') return;
+                livingCount++;
+
+                // Gravity for grounded states to prevent floating
+                if (cm.state === 'IDLE' || cm.state === 'STUNNED') {
+                    if (cm.y < CAVEMAN_Y_POS) {
+                        cm.y += 5; // Gravity pull
+                        if (cm.y > CAVEMAN_Y_POS) cm.y = CAVEMAN_Y_POS;
+                    }
+                }
+
+                if (cm.state === 'IDLE') {
+                    // Walk
+                    cm.x += cm.vx;
+                    if (cm.x < CAVEMAN_SIZE/2 || cm.x > GAME_WIDTH - CAVEMAN_SIZE/2) cm.vx *= -1;
+                    // Random turn
+                    if (Math.random() < 0.005) cm.vx *= -1;
+                    if (Math.abs(cm.vx) > 0.1) cm.direction = Math.sign(cm.vx);
+
+                    // Shoot
+                    if (now - cm.lastShotTime > settings.fireInterval) {
+                        cm.lastShotTime = now;
+                        const angle = Math.atan2(eagle.y - cm.y, eagle.x - cm.x);
+                        projectiles.push({
+                            x: cm.x,
+                            y: cm.y - 20,
+                            vx: Math.cos(angle) * ARROW_SPEED,
+                            vy: Math.sin(angle) * ARROW_SPEED
+                        });
+                    }
+                } else if (cm.state === 'STUNNED') {
+                    if (now - cm.stunTimer > STUN_DURATION) {
+                        cm.state = 'IDLE';
+                    }
+                } else if (cm.state === 'GRABBED') {
+                    cm.x = eagle.x;
+                    cm.y = eagle.y + EAGLE_SIZE/2 + 10;
+                    cm.vx = 0;
+                } else if (cm.state === 'FALLING') {
+                    cm.y += 5 + Math.abs(eagle.vy); // Fall fast
+                    
+                    // Collision with other cavemen
+                    let hitOthers = false;
+                    const isLethalFall = (cm.fallStartY || 0) < KILL_LINE_Y;
+
+                    for (let target of cavemen) {
+                        if (target.id !== cm.id && target.state !== 'DEAD' && target.state !== 'GRABBED') {
+                            const dist = Math.hypot(cm.x - target.x, cm.y - target.y);
+                            if (dist < CAVEMAN_SIZE) {
+                                hitOthers = true;
+                                if (isLethalFall) {
+                                    target.state = 'DEAD';
+                                    cm.state = 'DEAD';
+                                    createExplosion(target.x, target.y, '#FF0000');
+                                    createExplosion(cm.x, cm.y, '#8B0000');
+                                    healEagle(0.5); // Fall kill heals
+                                } else {
+                                    target.state = 'STUNNED';
+                                    target.stunTimer = now;
+                                    cm.state = 'STUNNED';
+                                    cm.stunTimer = now;
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // Hit Ground
+                    if (!hitOthers && cm.y >= CAVEMAN_Y_POS) {
+                        cm.y = CAVEMAN_Y_POS;
+                        if (isLethalFall) {
+                            cm.state = 'DEAD';
+                            createExplosion(cm.x, cm.y, '#8B4513');
+                        } else {
+                            cm.state = 'STUNNED';
+                            cm.stunTimer = now - (STUN_DURATION - FALL_STUN_DURATION);
+                        }
+                    }
+                }
+            });
+
+            if (livingCount === 0) {
+                gameOver(true);
+            }
+
+            // --- GRAB ATTEMPT ---
+            if (eagle.holdingId === null) {
+                cavemen.forEach(cm => {
+                    // ALLOW grabbing STUNNED cavemen
+                    if (cm.state !== 'DEAD' && cm.state !== 'GRABBED' && cm.state !== 'FALLING') {
+                        const dist = Math.hypot(eagle.x - cm.x, eagle.y - cm.y);
+                        if (dist < (EAGLE_SIZE + CAVEMAN_SIZE)/2) {
+                            eagle.holdingId = cm.id;
+                            cm.state = 'GRABBED';
+                        }
+                    }
+                });
+            }
+
+            // --- PROJECTILES ---
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Hit Eagle
+                const dist = Math.hypot(p.x - eagle.x, p.y - eagle.y);
+                if (dist < EAGLE_SIZE/2 + 10) {
+                    eagle.hp -= 1;
+                    createExplosion(eagle.x, eagle.y, '#FFD700');
+                    projectiles.splice(i, 1);
+                    if (eagle.hp <= 0) gameOver(false);
+                    continue;
+                }
+
+                // Out of bounds
+                if (p.x < 0 || p.x > GAME_WIDTH || p.y < 0 || p.y > GAME_HEIGHT) {
+                    projectiles.splice(i, 1);
+                }
+            }
+
+            // --- POOPS ---
+            for (let i = poops.length - 1; i >= 0; i--) {
+                const p = poops[i];
+                p.vy += POOP_GRAVITY;
+                p.y += p.vy;
+
+                let hit = false;
+                for (let cm of cavemen) {
+                    if (cm.state !== 'DEAD' && cm.state !== 'GRABBED') {
+                        const dist = Math.hypot(p.x - cm.x, p.y - cm.y);
+                        if (dist < CAVEMAN_SIZE) {
+                            hit = true;
+                            createExplosion(cm.x, cm.y, COLORS.poop);
+                            cm.hp -= 1;
+                            
+                            // HEAL ON POOP HIT
+                            healEagle(0.5);
+
+                            if (cm.hp <= 0) {
+                                cm.state = 'DEAD';
+                            } else {
+                                if (cm.state !== 'FALLING') {
+                                    cm.state = 'STUNNED';
+                                    cm.stunTimer = now;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (hit || p.y > GAME_HEIGHT) {
+                    poops.splice(i, 1);
+                }
+            }
+
+            // --- PARTICLES ---
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let pt = particles[i];
+                pt.x += pt.vx;
+                pt.y += pt.vy;
+                pt.life -= 0.05;
+                if (pt.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function healEagle(amount) {
+            eagle.hp = Math.min(EAGLE_MAX_HP, eagle.hp + amount);
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 1.0,
+                    color
+                });
+            }
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * RENDERING
+         * ------------------------------------------------------------------
+         */
+        function render() {
+            // Clear
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            drawBackground(GAME_WIDTH, GAME_HEIGHT);
+            
+            // Particles
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 5, 5);
+            });
+            ctx.globalAlpha = 1;
+
+            // Entities
+            cavemen.forEach(cm => drawCaveman(ctx, cm));
+            poops.forEach(p => drawPoop(ctx, p));
+            projectiles.forEach(p => drawProjectile(ctx, p));
+            drawEagle(ctx, eagle);
+        }
+
+        function drawBackground(w, h) {
+            ctx.fillStyle = COLORS.sky;
+            ctx.fillRect(0, 0, w, h);
+
+            // Sun
+            ctx.fillStyle = '#FFEE58';
+            ctx.fillRect(w - 120, 60, 80, 80);
+            ctx.fillStyle = '#FFF59D';
+            ctx.fillRect(w - 110, 70, 20, 20);
+
+            // Clouds
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillRect(100, 100, 100, 30);
+            ctx.fillRect(400, 150, 120, 40);
+
+            // Kill Line
+            ctx.strokeStyle = COLORS.killLine;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(0, KILL_LINE_Y);
+            ctx.lineTo(w, KILL_LINE_Y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Ground
+            ctx.fillStyle = COLORS.ground;
+            ctx.fillRect(0, h - 40, w, 40);
+            ctx.fillStyle = COLORS.grass;
+            for (let i = 0; i < w; i += 10) {
+                ctx.fillRect(i, h - 50, 10, 10);
+            }
+        }
+
+        function drawEagle(ctx, eagle) {
+            const { x, y, holdingId, vx, vy } = eagle;
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (vx < 0) ctx.scale(-1, 1);
+            ctx.rotate(vy * 0.05);
+
+            // Styles
+            const bodyColor = COLORS.eagleBody;
+            const featherColor = '#5D4037';
+            const headColor = COLORS.eagleHead;
+            const beakColor = COLORS.eagleBeak;
+
+            // Back Wing
+            ctx.save();
+            const flap = Math.sin(Date.now() / 150) * 10;
+            ctx.translate(5, -5 + flap);
+            ctx.rotate(-0.2);
+            ctx.fillStyle = featherColor;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(30, -20, 50, 0);
+            ctx.quadraticCurveTo(25, 10, 0, 5);
+            ctx.fill();
+            ctx.restore();
+
+            // Talons
+            ctx.fillStyle = beakColor;
+            ctx.beginPath();
+            if (holdingId !== null) {
+                ctx.arc(5, 15, 6, 0, Math.PI*2);
+            } else {
+                ctx.moveTo(0,10); ctx.lineTo(-5,20); ctx.lineTo(5,20);
+            }
+            ctx.fill();
+
+            // Tail
+            ctx.fillStyle = headColor;
+            ctx.beginPath();
+            ctx.moveTo(-15,0); ctx.lineTo(-35,-5); ctx.lineTo(-33,10); ctx.lineTo(-15,5);
+            ctx.fill();
+
+            // Body
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.ellipse(0,0, 25, 8, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = headColor;
+            ctx.beginPath();
+            ctx.arc(15, -6, 10, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(5,-4); ctx.quadraticCurveTo(15,-4,20,2); ctx.lineTo(5,2);
+            ctx.fill();
+
+            // Front Wing
+            ctx.save();
+            const fFlap = Math.sin(Date.now() / 150) * 15;
+            ctx.translate(0, -5 + fFlap);
+            const grad = ctx.createLinearGradient(0, -20, 0, 20);
+            grad.addColorStop(0, '#A0522D');
+            grad.addColorStop(1, '#5D4037');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(-10, 0);
+            ctx.bezierCurveTo(10, -35, 40, -25, 50, 10);
+            ctx.bezierCurveTo(30, 0, 10, 10, -10, 5);
+            ctx.fill();
+            ctx.strokeStyle = '#3E2723';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0,-5); ctx.lineTo(30,-5);
+            ctx.stroke();
+            ctx.restore();
+
+            // Beak
+            ctx.fillStyle = beakColor;
+            ctx.beginPath();
+            ctx.moveTo(23,-4); ctx.quadraticCurveTo(38,-1,33,8); ctx.lineTo(23,3);
+            ctx.fill();
+
+            // Sunglasses
+            ctx.fillStyle = COLORS.sunglasses;
+            ctx.fillRect(18, -8, 10, 4);
+            ctx.fillRect(15, -8, 12, 1);
+            ctx.fillStyle = '#FFF';
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath(); ctx.moveTo(20,-8); ctx.lineTo(23,-5); ctx.stroke();
+            ctx.globalAlpha = 1.0;
+
+            ctx.restore();
+        }
+
+        function drawCaveman(ctx, cm) {
+            const { x, y, state, direction } = cm;
+            const w = 24, h = 48;
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (state === 'GRABBED') ctx.rotate(Math.sin(Date.now()/100)*0.2);
+            else if (state === 'FALLING') ctx.scale(1,-1);
+            else if (state === 'DEAD') { ctx.rotate(Math.PI/2); ctx.translate(0, -h/2); }
+
+            if (state !== 'GRABBED' && state !== 'FALLING' && state !== 'DEAD') {
+                if (direction < 0) ctx.scale(-1, 1);
+            }
+
+            // Stun stars
+            if (state === 'STUNNED') {
+                ctx.fillStyle = '#FFFF00';
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                for(let i=0; i<5; i++) {
+                    ctx.lineTo(Math.cos(Date.now()/100 + i)*20, -h-20 + Math.sin(Date.now()/100 + i)*5);
+                }
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            // Draw
+            ctx.fillStyle = COLORS.cavemanSkin;
+            // Legs
+            if (state === 'WALKING' || (state === 'IDLE' && Math.abs(cm.vx)>0.1)) {
+                const s = Math.sin(Date.now()/100)*8;
+                ctx.fillRect(-8-s, h/4, 6, h/4);
+                ctx.fillRect(2+s, h/4, 6, h/4);
+            } else {
+                ctx.fillRect(-8, h/4, 6, h/4);
+                ctx.fillRect(2, h/4, 6, h/4);
+            }
+            // Torso
+            ctx.fillRect(-w/2, -h/4, w, h/2);
+            // Nipples
+            ctx.fillStyle = '#E6ACAC';
+            ctx.fillRect(-5, -h/4+5, 2,2); ctx.fillRect(3, -h/4+5, 2,2);
+            // Skirt
+            ctx.fillStyle = COLORS.cavemanSkirt;
+            ctx.fillRect(-w/2-2, 0, w+4, h/4+2);
+            
+            // Arms & Bow
+            ctx.fillStyle = COLORS.cavemanSkin;
+            if (state === 'IDLE' || state === 'WALKING') {
+                ctx.save(); ctx.translate(5, -h/4+5);
+                ctx.fillRect(0,0,12,6);
+                ctx.strokeStyle = '#5D4037'; ctx.lineWidth=2;
+                ctx.beginPath(); ctx.arc(10,3,15, -Math.PI/2, Math.PI/2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(10,-12); ctx.lineTo(10,18); ctx.strokeStyle='#EEE'; ctx.stroke();
+                ctx.restore();
+                ctx.fillRect(-8, -h/4+5, 6, 10);
+            } else {
+                ctx.save(); ctx.translate(-w/2, -h/4+5); ctx.rotate(0.5); ctx.fillRect(0,0,6,18); ctx.restore();
+                ctx.save(); ctx.translate(w/2, -h/4+5); ctx.rotate(-0.5); ctx.fillRect(-6,0,6,18); ctx.restore();
+            }
+
+            // Head
+            ctx.fillStyle = COLORS.cavemanSkin;
+            ctx.fillRect(-10, -h/4-18, 20, 18);
+            ctx.fillStyle = '#3E2723';
+            ctx.fillRect(-12, -h/4-22, 24, 8);
+
+            // Face
+            if (state === 'DEAD') {
+                ctx.fillStyle = '#000'; ctx.fillText('X X', -8, -h/4-8);
+            } else {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(-5, -h/4-10, 3,3); ctx.fillRect(2, -h/4-10, 3,3);
+                ctx.fillRect(-4, -h/4-3, 8,2);
+            }
+
+            // HP Bar
+            if (state !== 'DEAD') {
+                for (let i=0; i<3; i++) {
+                    ctx.fillStyle = i < cm.hp ? '#FF0000' : '#444';
+                    ctx.fillRect(-12 + i*9, -h-20, 7, 4);
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function drawProjectile(ctx, p) {
+            ctx.save(); ctx.translate(p.x, p.y);
+            ctx.rotate(Math.atan2(p.vy, p.vx));
+            ctx.fillStyle = '#5D4037'; ctx.fillRect(-15,-1,30,2);
+            ctx.fillStyle = '#AAA'; ctx.beginPath(); ctx.moveTo(15,-3); ctx.lineTo(23,0); ctx.lineTo(15,3); ctx.fill();
+            ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.moveTo(-15,0); ctx.lineTo(-21,-4); ctx.lineTo(-17,0); ctx.lineTo(-21,4); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPoop(ctx, p) {
+            ctx.save(); ctx.translate(p.x, p.y);
+            ctx.fillStyle = COLORS.poop;
+            ctx.beginPath();
+            ctx.arc(0, 4, 10, 0, Math.PI*2);
+            ctx.arc(0, -2, 7, 0, Math.PI*2);
+            ctx.arc(0, -8, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#FFF'; ctx.globalAlpha=0.6;
+            ctx.beginPath(); ctx.arc(-3,-2,2,0,Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * HUD UPDATES
+         * ------------------------------------------------------------------
+         */
+        function updateHUD() {
+            // Hearts
+            const heartsEl = document.getElementById('hearts');
+            let hStr = '';
+            const full = Math.floor(eagle.hp);
+            const half = eagle.hp % 1 !== 0;
+            const empty = 3 - Math.ceil(eagle.hp);
+            
+            for(let i=0; i<full; i++) hStr += '❤️';
+            if(half) hStr += '💔';
+            for(let i=0; i<empty; i++) hStr += '🖤';
+            heartsEl.innerText = hStr;
+
+            const rageEl = document.getElementById('rage-text');
+            if (eagle.hp <= 1) rageEl.classList.remove('hidden');
+            else rageEl.classList.add('hidden');
+
+            // Poop
+            const barFill = document.getElementById('poop-bar-fill');
+            barFill.style.width = eagle.poopCharge + '%';
+            
+            const readyEl = document.getElementById('poop-ready-text');
+            if (eagle.poopCharge >= 100) readyEl.classList.remove('hidden');
+            else readyEl.classList.add('hidden');
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * CONTROLS (JOYSTICK)
+         * ------------------------------------------------------------------
+         */
+        function setupJoystick() {
+            const base = document.getElementById('joystick-base');
+            const stick = document.getElementById('joystick-stick');
+            
+            let startX = 0, startY = 0;
+            const maxRadius = 45; // slightly less than visual radius to keep knob inside
+
+            const handleStart = (cx, cy) => {
+                const rect = base.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                startX = cx;
+                startY = cy;
+                
+                // If touching direct, snap
+                updateStick(cx, cy, centerX, centerY);
+                
+                input.active = true;
+                stick.classList.add('active');
+            };
+
+            const handleMove = (cx, cy) => {
+                if (!input.active) return;
+                const rect = base.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                updateStick(cx, cy, centerX, centerY);
+            };
+
+            const handleEnd = () => {
+                if (input.active) {
+                    input.justReleased = true;
+                }
+                input.active = false;
+                input.dx = 0;
+                input.dy = 0;
+                stick.style.transform = `translate(0px, 0px)`;
+                stick.classList.remove('active');
+            };
+
+            const updateStick = (cx, cy, centerX, centerY) => {
+                let dx = cx - centerX;
+                let dy = cy - centerY;
+                const dist = Math.hypot(dx, dy);
+                
+                // Normalized Input
+                let normX = dx;
+                let normY = dy;
+                
+                if (dist > maxRadius) {
+                    const ratio = maxRadius / dist;
+                    dx *= ratio;
+                    dy *= ratio;
+                }
+                
+                // Logic Input (normalized to 1 at edge)
+                let logicDist = dist;
+                if (logicDist > maxRadius) logicDist = maxRadius;
+                
+                input.dx = dx / maxRadius;
+                input.dy = dy / maxRadius;
+
+                stick.style.transform = `translate(${dx}px, ${dy}px)`;
+            };
+
+            // Mouse
+            base.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
+            window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
+            window.addEventListener('mouseup', handleEnd);
+
+            // Touch
+            base.addEventListener('touchstart', e => {
+                e.preventDefault();
+                handleStart(e.touches[0].clientX, e.touches[0].clientY);
+            }, {passive: false});
+            
+            window.addEventListener('touchmove', e => {
+                e.preventDefault();
+                if (e.touches.length) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+            }, {passive: false});
+            
+            window.addEventListener('touchend', handleEnd);
+            window.addEventListener('touchcancel', handleEnd);
+        }
+
+    </script>
+</body>
+</html>
